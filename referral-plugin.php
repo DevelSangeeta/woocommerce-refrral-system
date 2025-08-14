@@ -106,17 +106,6 @@ function cwr_referral_dashboard_query_vars($vars) {
 add_filter('query_vars', 'cwr_referral_dashboard_query_vars');
 
 // Add Referral Dashboard to My Account menu
-// function cwr_add_referral_dashboard_to_my_account_menu($items) {
-//     $new_items = [];
-//     foreach ($items as $key => $value) {
-//         $new_items[$key] = $value;
-//         if ($key === 'dashboard') {
-//             $new_items['referral-dashboard'] = __('Referrals', 'cwr');
-//         }
-//     }
-//     return $new_items;
-// }
-// add_filter('woocommerce_account_menu_items', 'cwr_add_referral_dashboard_to_my_account_menu');
 function cwr_add_referral_dashboard_to_my_account_menu($items) {
     if (is_user_logged_in() && in_array('customer', wp_get_current_user()->roles)) {
         $new_items = [];
@@ -131,15 +120,8 @@ function cwr_add_referral_dashboard_to_my_account_menu($items) {
     return $items;
 }
 add_filter('woocommerce_account_menu_items', 'cwr_add_referral_dashboard_to_my_account_menu');
+
 // Render Referral Dashboard content
-// function cwr_referral_dashboard_content() {
-//     if (!is_user_logged_in()) {
-//         echo '<p>' . esc_html__('Please log in to view your referral dashboard.', 'cwr') . '</p>';
-//         return;
-//     }
-//     echo do_shortcode('[cwr_referral_dashboard]');
-// }
-// add_action('woocommerce_account_referral-dashboard_endpoint', 'cwr_referral_dashboard_content');
 function cwr_referral_dashboard_content() {
     if (!is_user_logged_in() || !in_array('customer', wp_get_current_user()->roles)) {
         wp_safe_redirect(wc_get_page_permalink('my-account'));
@@ -148,6 +130,7 @@ function cwr_referral_dashboard_content() {
     echo do_shortcode('[cwr_referral_dashboard]');
 }
 add_action('woocommerce_account_referral-dashboard_endpoint', 'cwr_referral_dashboard_content');
+
 // Flush rewrite rules on plugin activation
 function cwr_flush_rewrite_rules() {
     cwr_add_referral_dashboard_endpoint();
@@ -156,23 +139,6 @@ function cwr_flush_rewrite_rules() {
 register_activation_hook(__FILE__, 'cwr_flush_rewrite_rules');
 
 // Generate and retrieve referral code
-// function cwr_get_user_referral_code($user_id) {
-//     $meta_key = 'cwr_referral_code';
-//     $referral_code = get_user_meta($user_id, $meta_key, true);
-
-//     if (empty($referral_code)) {
-//         $random_string = wp_generate_password(6, false, false);
-//         $referral_code = base64_encode($user_id . '-' . $random_string);
-//         $referral_code = str_replace(['+', '/', '='], ['-', '_', ''], $referral_code);
-//         $updated = update_user_meta($user_id, $meta_key, $referral_code);
-//         error_log('CWR Referral: Generated referral code for user ID ' . $user_id . ': ' . $referral_code . ' (Updated: ' . ($updated ? 'Yes' : 'No') . ')');
-//     } else {
-//         error_log('CWR Referral: Retrieved existing referral code for user ID ' . $user_id . ': ' . $referral_code);
-//     }
-
-//     return $referral_code ?: 'error-generating-code';
-// }
-
 function cwr_get_user_referral_code($user_id) {
     $code = get_user_meta($user_id, 'cwr_referral_code', true);
     
@@ -265,24 +231,6 @@ function cwr_update_wallet_balance($user_id, $amount) {
 }
 
 // Calculate redeemable wallet amount
-// function cwr_get_redeemable_amount($user_id) {
-//     $balance = get_user_meta($user_id, 'cwr_wallet_balance', true);
-//     if ($balance === '') {
-//         error_log('CWR Wallet: No cwr_wallet_balance meta for user ID ' . $user_id);
-//         cwr_initialize_wallet_balance($user_id);
-//         $balance = '0.00';
-//     }
-//     $balance = floatval($balance);
-//     error_log('CWR Wallet: Calculated redeemable amount for user ID ' . $user_id . ': Balance=' . $balance);
-//     if ($balance >= 10.00) {
-//         $redeemable = round($balance * 0.30, 2); // 30% of balance, rounded to 2 decimals
-//         error_log('CWR Wallet: Redeemable amount for user ID ' . $user_id . ': ' . $redeemable);
-//         return $redeemable;
-//     }
-//     error_log('CWR Wallet: Balance < 10.00 for user ID ' . $user_id . ', redeemable amount = 0.00');
-//     return 0.00;
-// }
-
 function cwr_get_redeemable_amount($user_id) {
     // Get wallet balance from user meta
     $wallet_balance = floatval(get_user_meta($user_id, 'cwr_wallet_balance', true));
@@ -349,24 +297,37 @@ function cwr_get_wallet_discount_preview() {
         wp_send_json_error(['message' => 'Not an authorized user.']);
     }
 
-    $redeemable_amount = cwr_get_redeemable_amount($user->ID);
-    if ($redeemable_amount <= 0) {
+    $wallet_balance = floatval(get_user_meta($user->ID, 'cwr_wallet_balance', true));
+
+    if ($wallet_balance <= 0) {
         wp_send_json_error(['message' => 'Insufficient wallet balance to redeem.']);
     }
 
-    $cart = WC()->cart;
-    $cart_total = $cart->get_subtotal(); // Excludes taxes and shipping
-    $discount = min($redeemable_amount, $cart_total); // Don't exceed cart total
-
-    // Set session flag for redemption
     $redeem_active = isset($_POST['redeem_active']) && $_POST['redeem_active'] === '1';
+    $redeem_amount = $redeem_active ? (isset($_POST['redeem_amount']) ? floatval($_POST['redeem_amount']) : 0) : 0;
+
+    $max_redeem = 30;
+
+    if ($redeem_amount > $max_redeem) {
+        wp_send_json_error(['message' => 'Max $30 redeemable per order']);
+    }
+
+    if ($redeem_amount > $wallet_balance) {
+        wp_send_json_error(['message' => "You don't have enough balance in your wallet"]);
+    }
+
+    $cart = WC()->cart;
+    $cart_total = $cart->get_subtotal();
+    $discount = min($redeem_amount, $cart_total);
+
     WC()->session->set('cwr_redeem_wallet_active', $redeem_active);
     WC()->session->set('cwr_wallet_discount', $redeem_active ? $discount : 0);
+    WC()->session->set('cwr_redeem_amount', $redeem_active ? $redeem_amount : 0);
 
     wp_send_json_success([
         'discount' => wc_price($discount),
         'new_total' => wc_price($cart_total - $discount),
-        'message' => $redeem_active ? sprintf(__('Wallet discount applied!', 'cwr'), wc_price($discount), wc_price($cart_total - $discount)) : __('Wallet discount removed.', 'cwr')
+        'message' => $redeem_active ? sprintf(__('Wallet discount of %s applied!', 'cwr'), wc_price($discount), wc_price($cart_total - $discount)) : __('Wallet discount removed.', 'cwr')
     ]);
 }
 add_action('wp_ajax_cwr_wallet_discount_preview', 'cwr_get_wallet_discount_preview');
@@ -387,17 +348,10 @@ function cwr_apply_wallet_discount() {
         return;
     }
 
-    $redeemable_amount = cwr_get_redeemable_amount($user->ID);
-    if ($redeemable_amount <= 0) {
-        return;
-    }
-
-    $cart = WC()->cart;
-    $cart_total = $cart->get_subtotal(); // Excludes taxes and shipping
-    $discount = min($redeemable_amount, $cart_total); // Don't exceed cart total
+    $discount = WC()->session->get('cwr_wallet_discount', 0);
 
     if ($discount > 0) {
-        $cart->add_fee(__('Wallet Discount', 'cwr'), -$discount);
+        WC()->cart->add_fee(__('Wallet Discount', 'cwr'), -$discount);
         error_log('CWR Wallet: Applied temporary discount of ' . $discount . ' for user ID ' . $user->ID);
     }
 }
@@ -414,177 +368,109 @@ function cwr_apply_wallet_discount_to_order($order) {
         return;
     }
 
-    $redeemable_amount = cwr_get_redeemable_amount($user->ID);
-    if ($redeemable_amount <= 0) {
+    $redeem_amount = isset($_POST['cwr_redeem_amount']) ? floatval($_POST['cwr_redeem_amount']) : 0;
+    if ($redeem_amount <= 0) {
         return;
     }
 
-    $cart_total = WC()->cart->get_subtotal(); // Excludes taxes and shipping
-    $discount = min($redeemable_amount, $cart_total); // Don't exceed cart total
+    $wallet_balance = floatval(get_user_meta($user->ID, 'cwr_wallet_balance', true));
+    $max_redeem = 30;
+    if ($redeem_amount > $max_redeem || $redeem_amount > $wallet_balance) {
+        return;
+    }
+
+    $cart_total = WC()->cart->get_subtotal();
+    $discount = min($redeem_amount, $cart_total);
 
     if ($discount > 0) {
         $order->add_fee(__('Wallet Discount', 'cwr'), -$discount);
-        WC()->session->set('cwr_wallet_discount', $discount);
+        $order->update_meta_data('_cwr_wallet_discount', $discount);
         error_log('CWR Wallet: Applied discount of ' . $discount . ' to order for user ID ' . $user->ID);
     }
 }
-add_action('woocommerce_checkout_create_order', 'cwr_apply_wallet_discount_to_order', 10, 1);
+add_action('woocommerce_checkout_create_order', 'cwr_apply_wallet_discount_to_order');
 
-// Deduct wallet balance after order completion
-function cwr_deduct_wallet_balance($order_id) {
-    if (!is_user_logged_in() || !cwr_check_woocommerce()) {
+// Deduct wallet balance on order completion
+function cwr_deduct_wallet_on_order_complete($order_id) {
+    $order = wc_get_order($order_id);
+    if ($order->get_status() !== 'completed') {
         return;
     }
 
-    $user = wp_get_current_user();
-    if (!in_array('customer', (array)$user->roles)) {
+    $user_id = $order->get_user_id();
+    if (!$user_id) {
         return;
     }
 
-    $discount = WC()->session->get('cwr_wallet_discount', 0);
+    $discount = floatval($order->get_meta('_cwr_wallet_discount'));
     if ($discount > 0) {
-        $result = cwr_update_wallet_balance($user->ID, -$discount);
-        if ($result !== false) {
-            $order = wc_get_order($order_id);
-            $order->add_order_note(sprintf(__('Applied wallet discount of %s. New wallet balance: %s', 'cwr'), wc_price($discount), wc_price(floatval(get_user_meta($user->ID, 'cwr_wallet_balance', true)))));
-            WC()->session->set('cwr_wallet_discount', 0);
-            WC()->session->set('cwr_redeem_wallet_active', false);
-            error_log('CWR Wallet: Deducted ' . $discount . ' from user ID ' . $user->ID . ' for order ID ' . $order_id);
-        }
+        cwr_update_wallet_balance($user_id, -$discount);
+        error_log('CWR Wallet: Deducted ' . $discount . ' from wallet for user ID ' . $user_id . ' on order ' . $order_id);
     }
+
+    // Clear session
+    WC()->session->set('cwr_redeem_wallet_active', false);
+    WC()->session->set('cwr_wallet_discount', 0);
+    WC()->session->set('cwr_redeem_amount', 0);
 }
-add_action('woocommerce_order_status_completed', 'cwr_deduct_wallet_balance', 20);
+add_action('woocommerce_order_status_completed', 'cwr_deduct_wallet_on_order_complete');
 
-// Handle referral link access
-function cwr_handle_referral_link() {
-    if (isset($_GET['ref']) && !empty($_GET['ref'])) {
-        $referral_code = sanitize_text_field($_GET['ref']);
-        $verify_page = get_permalink(get_page_by_path('verify-referral-code'));
-        $login_page = wc_get_page_permalink('my-account');
-
-        if (!$verify_page || !$login_page) {
-            error_log('CWR Referral: Verify Referral Code or My Account page not found.');
-            return;
-        }
-
-        // Prevent redirect loop on verify-referral-code page
-        $current_page = get_queried_object();
-        if ($current_page instanceof WP_Post && $current_page->post_name === 'verify-referral-code') {
-            error_log('CWR Referral: On verify-referral-code page, skipping redirect.');
-            return;
-        }
-
-        if (!is_user_logged_in()) {
-            error_log('CWR Referral: Non-logged-in user accessed referral link with ref=' . $referral_code . ', redirecting to login.');
-            wp_safe_redirect(add_query_arg('redirect_to', $verify_page, $login_page));
-            exit;
-        }
-
+// Process referral verification
+function cwr_process_referral_verification() {
+    if (isset($_POST['cwr_verify_referral_code']) && wp_verify_nonce($_POST['cwr_verify_nonce'], 'cwr_verify_referral')) {
+        $referral_code = sanitize_text_field($_POST['referral_code']);
         $user_id = get_current_user_id();
+
+        if (!$user_id) {
+            set_transient('cwr_verify_error', 'You must be logged in to verify a referral code.', 30);
+            return;
+        }
+
         global $wpdb;
-        $has_verified = $wpdb->get_var($wpdb->prepare(
-            "SELECT id FROM {$wpdb->prefix}cwr_referrals WHERE referee_id = %d",
+        $referrer_id = $wpdb->get_var($wpdb->prepare(
+            "SELECT user_id FROM $wpdb->usermeta WHERE meta_key = 'cwr_referral_code' AND meta_value = %s",
+            $referral_code
+        ));
+
+        if (!$referrer_id) {
+            set_transient('cwr_verify_error', 'Invalid referral code.', 30);
+            return;
+        }
+
+        if ($referrer_id == $user_id) {
+            set_transient('cwr_verify_error', 'You cannot refer yourself.', 30);
+            return;
+        }
+
+        $existing_referral = $wpdb->get_var($wpdb->prepare(
+            "SELECT COUNT(*) FROM {$wpdb->prefix}cwr_referrals WHERE referee_id = %d",
             $user_id
         ));
 
-        if (!$has_verified) {
-            error_log('CWR Referral: User ID ' . $user_id . ' has not verified a referral code, redirecting to verify page.');
-            wp_safe_redirect($verify_page);
-            exit;
-        }
-
-        error_log('CWR Referral: User ID ' . $user_id . ' has already verified a referral code, no redirect needed.');
-    }
-}
-add_action('wp', 'cwr_handle_referral_link');
-
-// Process referral code verification
-function cwr_process_referral_verification() {
-    if (isset($_POST['cwr_verify_submit']) && isset($_POST['cwr_verify_nonce'])) {
-        if (!wp_verify_nonce($_POST['cwr_verify_nonce'], 'cwr_verify_referral')) {
-            set_transient('cwr_verify_error', 'Security check failed. Please try again.', 30);
-            error_log('CWR Verification: Nonce verification failed.');
+        if ($existing_referral > 0) {
+            set_transient('cwr_verify_error', 'You have already been referred.', 30);
             return;
         }
 
-        if (!is_user_logged_in()) {
-            set_transient('cwr_verify_error', 'You must be logged in to verify a referral code.', 30);
-            error_log('CWR Verification: User not logged in.');
-            wp_safe_redirect(wc_get_page_permalink('my-account'));
-            exit;
-        }
+        $wpdb->insert(
+            $wpdb->prefix . 'cwr_referrals',
+            [
+                'referrer_id'   => $referrer_id,
+                'referee_id'    => $user_id,
+                'referee_email' => get_userdata($user_id)->user_email,
+                'created_at'    => current_time('mysql'),
+            ],
+            ['%d', '%d', '%s', '%s']
+        );
 
-        $referral_code = sanitize_text_field($_POST['cwr_referral_code']);
-        $user_id = get_current_user_id();
+        cwr_initialize_wallet_balance($user_id); // Initialize wallet for Referee
+        cwr_initialize_wallet_balance($referrer_id); // Initialize wallet for Referrer
 
-        if (empty($referral_code)) {
-            set_transient('cwr_verify_error', 'Please enter a referral code.', 30);
-            error_log('CWR Verification: Empty referral code submitted.');
-            return;
-        }
-
-        // ✅ New check: Only allow if no completed orders exist
-        $customer_orders = wc_get_orders(array(
-            'customer_id' => $user_id,
-            'status'      => array('completed'),
-            'limit'       => 1,
-            'return'      => 'ids'
-        ));
-
-        if (!empty($customer_orders)) {
-            set_transient('cwr_verify_error', 'Coupon code is valid only for first order', 30);
-            error_log('CWR Verification: User ID ' . $user_id . ' already has a completed order. Referral denied.');
-            return;
-        } else {
-            global $wpdb;
-            $referrer_id = $wpdb->get_var($wpdb->prepare(
-                "SELECT user_id FROM $wpdb->usermeta WHERE meta_key = 'cwr_referral_code' AND meta_value = %s",
-                $referral_code
-            ));
-
-            if (!$referrer_id) {
-                set_transient('cwr_verify_error', 'Invalid referral code.', 30);
-                error_log('CWR Verification: Invalid referral code - ' . $referral_code);
-                return;
-            }
-
-            if ($referrer_id == $user_id) {
-                set_transient('cwr_verify_error', 'You cannot use your own referral code.', 30);
-                error_log('CWR Verification: Self-referral attempted by user ID ' . $user_id);
-                return;
-            }
-
-            $existing_referral = $wpdb->get_var($wpdb->prepare(
-                "SELECT id FROM {$wpdb->prefix}cwr_referrals WHERE referee_id = %d",
-                $user_id
-            ));
-
-            if ($existing_referral) {
-                set_transient('cwr_verify_error', 'You have already verified a referral code.', 30);
-                error_log('CWR Verification: Duplicate referral for user ID ' . $user_id);
-                return;
-            }
-
-            $wpdb->insert(
-                $wpdb->prefix . 'cwr_referrals',
-                [
-                    'referrer_id'   => $referrer_id,
-                    'referee_id'    => $user_id,
-                    'referee_email' => get_userdata($user_id)->user_email,
-                    'created_at'    => current_time('mysql'),
-                ],
-                ['%d', '%d', '%s', '%s']
-            );
-
-            cwr_initialize_wallet_balance($user_id); // Initialize wallet for Referee
-            cwr_initialize_wallet_balance($referrer_id); // Initialize wallet for Referrer
-
-            set_transient('cwr_verify_success', 'Referral code verified successfully!', 30);
-            error_log('CWR Verification: Linked referee ID ' . $user_id . ' to referrer ID ' . $referrer_id);
-            $referral_dashboard_url = get_site_url() . '/my-account/referral-dashboard/';
-            wp_safe_redirect($referral_dashboard_url);
-            exit;
-        }
+        set_transient('cwr_verify_success', 'Referral code verified successfully!', 30);
+        error_log('CWR Verification: Linked referee ID ' . $user_id . ' to referrer ID ' . $referrer_id);
+        $referral_dashboard_url = get_site_url() . '/my-account/referral-dashboard/';
+        wp_safe_redirect($referral_dashboard_url);
+        exit;
     }
 }
 add_action('init', 'cwr_process_referral_verification');
@@ -651,7 +537,7 @@ function cwr_apply_referral_credits($order_id, $old_status, $new_status) {
         $referee = get_userdata($referral->referee_id);
         if ($referee) {
             cwr_update_wallet_balance($referral->referee_id, $amount);
-            error_log('CWR Referral: Credited wallet for referee ID ' . $referral->referee_id . ': ' . $amount);
+            error_log('CWR Referral: Credited wallet for referee ID ' . $referee_id . ': ' . $amount);
         }
     }
 }
@@ -688,14 +574,6 @@ function cwr_add_admin_menu() {
     );
 
     remove_submenu_page('cwr-settings', 'cwr-settings');
-    // add_submenu_page(
-    //     'cwr-settings',
-    //     __('Overview', 'cwr'),
-    //     __('Overview', 'cwr'),
-    //     'manage_options',
-    //     'cwr-settings',
-    //     'cwr_settings_page_callback'
-    // );
 }
 add_action('admin_menu', 'cwr_add_admin_menu');
 

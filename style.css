@@ -1,0 +1,168 @@
+.referral-section {
+    background: #ffffff;
+    padding: 40px;
+    font-family: inherit;
+    color: #36604e;
+}
+
+.referral-container {
+    display: flex;
+    flex-wrap: wrap;
+    background: #f8fdfb;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.referral-left, .referral-right {
+    flex: 1;
+    padding: 30px;
+    min-width: 300px;
+}
+
+.referral-left {
+    border-right: 2px solid #e0ece6;
+}
+
+.referral-left h2 {
+    margin-bottom: 10px;
+    color: #36604e;
+    text-align: left;
+}
+
+.small-text {
+    font-size: 14px;
+    color: #191919;
+    margin-bottom: 20px;
+}
+
+.referral-input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #c2d5cd;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+/* .apply-btn {
+    background: #36604e;
+    color: white;
+    border: none;
+    padding: 12px 18px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.2s ease-in-out;
+}
+
+.apply-btn:hover {
+    background: #0f452c;
+} */
+
+.apply-btn {
+    height: 43px;
+    padding: 0px 20px;
+    text-align: center;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 47px;
+    display: inline-block;
+    border-radius: 5px;
+    position: relative;
+    overflow: hidden !important;
+    border-bottom-right-radius: 20px;
+    background-color: #36604e;
+    transition: all ease 0.3s;
+}
+.apply-btn:hover {
+    background-color: transparent;
+    border: 1px solid #36604e;
+    color: #36604e;
+    transition: all ease 0.3s;
+}
+
+/* For input[type="submit"] to reset default styles */
+input.apply-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none; /* remove default */
+}
+
+.disclaimer {
+    color: #666;
+    margin-top: 15px;
+}
+
+.info-box {
+    background: #e6f4ee;
+    padding: 12px;
+    border-left: 4px solid #36604e;
+    margin-bottom: 20px;
+}
+
+.how-title {
+    color: #36604e;
+    margin-bottom: 20px;
+}
+
+/* .how-title span {
+    font-weight: normal;
+    font-size: 16px;
+    color: #444;
+} */
+
+.step {
+    margin-bottom: 20px;
+}
+
+.step h4 {
+    margin: 0 0 5px;
+    color: #36604e;
+    text-transform: capitalize;
+}
+
+.step p {
+    margin: 0 0 5px;
+    color: #191919;
+}
+
+.step .note {
+    font-size: inherit;
+    color: #191919;
+    font-style: italic;
+}
+
+.help-text {
+    margin-top: 20px;
+}
+
+.help-text a {
+    color: #36604e;
+    text-decoration: underline;
+}
+
+@media screen and (max-width: 480px){
+    .inner-banner-wrap.referral-prg-ban .inner-banner-content {
+        width: 100%;
+        display: block;
+        position: absolute;
+        z-index: 5;
+        left: 0;
+        top: 45%;
+        padding: 0 15px;
+    }
+    .inner-banner-wrap.referral-prg-ban {
+        width: 100%;
+        height: 330px;
+        position: relative;
+    }
+    .inner-banner-wrap.referral-prg-ban .inner-banner-content h1, .inner-banner-wrap.referral-prg-ban .inner-banner-content h2 {
+        font-size: 30px;
+        line-height: 50px;
+    }
+    .referral-section {
+        padding: 20px 15px;
+    }
+}
